@@ -98,6 +98,20 @@ module Teeplate
     end
 
     # :nodoc:
+    def destroy(skip? = false)
+      unless skip?
+        begin
+          File.delete out_path
+          list_if_any "destroyed ", :red
+        rescue
+          list_if_any "skipped ", :yellow
+        end
+      else
+        list_if_any "skipped ", :yellow
+      end
+    end
+
+    # :nodoc:
     def set_perm
       if perm = @data.perm? && File.file?(out_path)
         File.chmod(out_path, @data.perm)
@@ -132,6 +146,7 @@ module Teeplate
       return :keep if !@renderer.interactive? || @renderer.keeps_all?
       return modifies?("#{local_path} is a symlink...", diff: false) if File.symlink?(out_path)
       return :modify if appends?
+      return :destroy if @renderer.pending_destroy?
       return :none if identical?
       modifies?("#{local_path} already exists...", diff: true)
     end
@@ -223,8 +238,10 @@ module Teeplate
       begin
         if !GIT.empty?
           Process.new(GIT, ["diff", "--no-index", "--", out_path, "-"], shell: true, input: r, output: w2, error: Process::Redirect::Inherit).wait
+          # Process.new(GIT, ["diff", "--no-index", "--", out_path, "-"], shell: true, input: r, output: Process::Redirect::Inherit, error: Process::Redirect::Inherit).wait
         elsif !DIFF.empty?
           Process.new(DIFF, ["-u", out_path, "-"], shell: true, input: r, output: w2, error: Process::Redirect::Inherit).wait
+          # Process.new(DIFF, ["-u", out_path, "-"], shell: true, input: r, output: Process::Redirect::Inherit, error: Process::Redirect::Inherit).wait
         else
           w2.puts "No diff command is installed."
         end
